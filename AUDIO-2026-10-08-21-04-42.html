@@ -1,0 +1,604 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Smoothiebar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
+<style>
+/* Layout: one-screen idle game. Money panel on top, a tappable smoothie on a bar counter, then tabs (Team, Verbeteringen, Seizoen) with a scrolling list below. */
+:root{
+  --bg:#EAF3FF;
+  --surface:#FFFFFF;
+  --fg:#1B2447;
+  --muted:#58628C;
+  --line:#CBD8F2;
+  --accent:#E8433F;
+  --on-accent:#FFFFFF;
+  --sun:#FFC933;
+  --plum:#6C4DF0;
+  --buy:#1F8F49;
+  --on-buy:#FFFFFF;
+  --sky1:#C9E2FF;
+  --sky2:#EAF3FF;
+  --counter:#C98B5A;
+  --counter-edge:#A86F42;
+  --tint-red:#FFE1DE;
+  --tint-sun:#FFF0BE;
+  --tint-plum:#E4DDFF;
+  --font-display:'Fredoka','Trebuchet MS',system-ui,sans-serif;
+  --font-body:'Nunito','Segoe UI',system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12172E;--surface:#1E2646;--fg:#F1F4FF;--muted:#A9B4DC;--line:#304061;
+    --accent:#FF6A5E;--on-accent:#2A0D0B;--sun:#FFD04D;--plum:#8E78FF;--buy:#4CCB7C;--on-buy:#06210F;
+    --sky1:#222C5E;--sky2:#151B38;--counter:#6E4B36;--counter-edge:#8A6046;
+    --tint-red:#4A2630;--tint-sun:#4A4222;--tint-plum:#32295F;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12172E;--surface:#1E2646;--fg:#F1F4FF;--muted:#A9B4DC;--line:#304061;
+  --accent:#FF6A5E;--on-accent:#2A0D0B;--sun:#FFD04D;--plum:#8E78FF;--buy:#4CCB7C;--on-buy:#06210F;
+  --sky1:#222C5E;--sky2:#151B38;--counter:#6E4B36;--counter-edge:#8A6046;
+  --tint-red:#4A2630;--tint-sun:#4A4222;--tint-plum:#32295F;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-weight:700;font-size:16px;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
+button:focus-visible{outline:4px solid var(--plum);outline-offset:3px}
+svg{display:block}
+h1,h2,h3,p,dl,dd{margin:0}
+
+#app{height:100%;max-width:640px;margin:0 auto;padding:10px 16px;display:flex;flex-direction:column;gap:10px}
+
+/* Money panel */
+.hud{display:flex;align-items:center;gap:12px;background:var(--surface);border-radius:22px;padding:10px 16px;box-shadow:0 4px 0 var(--line)}
+.coin{width:44px;height:44px;flex:none}
+.hud .main{flex:1;min-width:0}
+.hud .big{font-family:var(--font-display);font-weight:700;font-size:2rem;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud .sub{color:var(--muted);font-size:.95rem;font-variant-numeric:tabular-nums}
+.pills{display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex:none}
+.pill{font-family:var(--font-display);font-size:.9rem;border-radius:99px;padding:2px 10px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pill.boost{background:var(--sun);color:#2b2100}
+.pill.fans{background:var(--tint-plum);color:var(--fg)}
+.ticker{text-align:center;color:var(--muted);font-size:.92rem;line-height:1.3;min-height:1.3em;transition:opacity .4s;text-wrap:balance}
+
+/* Stage */
+.stage{position:relative;flex:0 0 clamp(200px,31vh,270px);border-radius:26px;overflow:hidden;background:linear-gradient(var(--sky1),var(--sky2));user-select:none;-webkit-user-select:none}
+.counter{position:absolute;left:0;right:0;bottom:0;height:40px;background:var(--counter);border-top:5px solid var(--counter-edge)}
+.hint{position:absolute;left:12px;right:12px;bottom:8px;text-align:center;color:#fff;font-size:.9rem;text-shadow:0 1px 2px rgba(0,0,0,.4);z-index:2}
+.cup{position:absolute;left:50%;top:10px;height:calc(100% - 82px);aspect-ratio:120/150;transform:translateX(-50%);background:none;border:0;padding:0;z-index:1}
+.cup svg{width:100%;height:100%;filter:drop-shadow(0 6px 0 rgba(0,0,0,.12))}
+.team{position:absolute;left:8px;right:8px;bottom:6px;display:flex;justify-content:center;gap:8px;z-index:2}
+.team .av{position:relative;width:46px;flex:none}
+.team .av svg{animation:bob 2.4s ease-in-out infinite;animation-delay:var(--d)}
+.team .av b{position:absolute;right:-4px;bottom:-3px;background:var(--fg);color:var(--bg);border-radius:99px;font-size:.72rem;min-width:22px;height:20px;display:grid;place-items:center;padding:0 4px;font-variant-numeric:tabular-nums}
+@keyframes bob{50%{transform:translateY(-4px)}}
+.fl{position:absolute;pointer-events:none;z-index:4;font-family:var(--font-display);font-weight:700;font-size:1.5rem;color:var(--fg);text-shadow:0 0 6px var(--sky2),0 0 6px var(--sky2);white-space:nowrap}
+.drama{position:absolute;z-index:3;display:flex;align-items:center;gap:6px;background:var(--sun);color:#2b2100;border:0;border-radius:99px;padding:4px 16px 4px 6px;font-family:var(--font-display);font-weight:600;font-size:1.05rem;box-shadow:0 4px 0 rgba(0,0,0,.22);animation:wob 1.1s ease-in-out infinite}
+.drama .dart{width:40px;flex:none}
+@keyframes wob{50%{transform:rotate(-4deg) scale(1.05)}}
+
+/* Tabs */
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tab{position:relative;min-height:48px;border:0;border-radius:16px;background:var(--surface);box-shadow:0 3px 0 var(--line);font-family:var(--font-display);font-weight:600;font-size:1.05rem;padding:0 6px}
+.tab[aria-selected="true"]{background:var(--plum);color:#fff;box-shadow:0 3px 0 rgba(0,0,0,.2)}
+.tab .dot{position:absolute;top:-6px;right:-2px;min-width:22px;height:22px;border-radius:99px;background:var(--accent);color:var(--on-accent);font-size:.8rem;display:grid;place-items:center;padding:0 5px}
+.panel{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px;padding-bottom:10px}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;min-height:40px;border:0;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 2px var(--line);font-family:var(--font-display);font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg);box-shadow:none}
+
+/* Rows */
+.row{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--surface);border-radius:20px;padding:10px 12px;box-shadow:0 3px 0 var(--line)}
+.row .av{position:relative;width:56px}
+.row .av b{position:absolute;right:-4px;bottom:-4px;background:var(--fg);color:var(--bg);border-radius:99px;font-size:.78rem;min-width:24px;height:22px;display:grid;place-items:center;padding:0 5px;font-variant-numeric:tabular-nums}
+.row .av.locked svg{opacity:.3;filter:grayscale(1)}
+.row .av.locked b{display:none}
+.inf{min-width:0}
+.inf h3{font-family:var(--font-display);font-weight:600;font-size:1.05rem;line-height:1.2}
+.inf p{margin-top:2px;color:var(--muted);font-size:.88rem;line-height:1.3}
+.inf p.pr{color:var(--fg)}
+.buy{min-width:104px;min-height:58px;border:0;border-radius:16px;background:var(--buy);color:var(--on-buy);box-shadow:0 4px 0 rgba(0,0,0,.22);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:600;padding:0 10px}
+.buy .bl{font-size:.8rem;opacity:.92}
+.buy .bc{font-size:1.15rem;font-variant-numeric:tabular-nums}
+.buy:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.22)}
+.buy:disabled{background:var(--line);color:var(--muted);box-shadow:none;cursor:not-allowed}
+.mul{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;font-family:var(--font-display);font-weight:700;font-size:1.15rem;background:var(--tint-sun);color:var(--fg)}
+.mul.tap{background:var(--tint-red)}
+.note{color:var(--muted);text-align:center;font-size:.92rem;line-height:1.35;padding:4px 8px}
+
+/* Season tab */
+.card{background:var(--surface);border-radius:20px;padding:14px 16px;box-shadow:0 3px 0 var(--line);display:flex;flex-direction:column;gap:10px}
+.card h3{font-family:var(--font-display);font-weight:600;font-size:1.2rem}
+.card p{color:var(--muted);font-size:.95rem;line-height:1.4}
+.facts{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:.98rem}
+.facts dt{color:var(--muted)}
+.facts dd{text-align:right;font-variant-numeric:tabular-nums}
+.btn{border:0;border-radius:999px;background:var(--accent);color:var(--on-accent);font-family:var(--font-display);font-weight:600;font-size:1.1rem;min-height:52px;padding:0 22px;box-shadow:0 4px 0 rgba(0,0,0,.2);width:100%}
+.btn:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.2)}
+.btn:disabled{background:var(--line);color:var(--muted);box-shadow:none;cursor:not-allowed}
+.btn.alt{background:var(--bg);color:var(--fg);box-shadow:0 4px 0 var(--line)}
+
+#toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);max-width:calc(100% - 32px);background:var(--fg);color:var(--bg);border-radius:18px;padding:10px 18px;font-size:.98rem;line-height:1.35;text-align:center;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:20}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (prefers-reduced-motion:reduce){
+  .team .av svg,.drama{animation:none}
+  .ticker,#toast{transition:none}
+}
+</style>
+
+<div id="app">
+  <section class="hud" aria-label="Je munten">
+    <svg class="coin" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#FFC933" stroke="#C99400" stroke-width="3"/><circle cx="24" cy="24" r="14" fill="none" stroke="#C99400" stroke-width="2.5" opacity=".6"/><path d="M17 31V17l7 8 7-8v14" fill="none" stroke="#8a6500" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="main">
+      <div class="big" id="coins">0</div>
+      <div class="sub"><span id="rate">0</span> per seconde</div>
+    </div>
+    <div class="pills"><span class="pill boost" id="boostPill" hidden></span><span class="pill fans" id="fansPill" hidden></span></div>
+  </section>
+  <p class="ticker" id="ticker" aria-live="off"></p>
+  <section class="stage" id="stage" aria-label="Smoothiebar">
+    <button class="cup" id="cup" aria-label="Maak een smoothie">
+      <svg viewBox="0 0 120 150" aria-hidden="true">
+        <defs><linearGradient id="smg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF8DBB"/><stop offset="1" stop-color="#FF5C8E"/></linearGradient></defs>
+        <path d="M78 6 L92 4 L84 58 L72 58Z" fill="#E8433F"/><path d="M80 24 L90 22 L89 30 L79 32Z" fill="#fff" opacity=".85"/>
+        <path d="M24 50 Q60 12 96 50Z" fill="#fff" opacity=".92"/>
+        <rect x="20" y="48" width="80" height="10" rx="5" fill="#F1F1F8"/>
+        <path d="M27 58 H93 L85 138 Q84 146 76 146 H44 Q36 146 35 138Z" fill="url(#smg)"/>
+        <path d="M34 66 Q36 100 42 130" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".35"/>
+        <g transform="translate(10 8)">
+          <circle cx="38" cy="82" r="7.5" fill="#fff"/><circle cx="62" cy="82" r="7.5" fill="#fff"/>
+          <circle cx="39.5" cy="83" r="3.8" fill="#1b1b2f"/><circle cx="63.5" cy="83" r="3.8" fill="#1b1b2f"/>
+          <ellipse cx="27" cy="94" rx="5.5" ry="3.4" fill="#fff" opacity=".45"/><ellipse cx="73" cy="94" rx="5.5" ry="3.4" fill="#fff" opacity=".45"/>
+          <path d="M40 95 Q50 107 60 95" fill="none" stroke="#1b1b2f" stroke-width="3.5" stroke-linecap="round"/>
+        </g>
+      </svg>
+    </button>
+    <div class="team" id="team"></div>
+    <div class="counter"></div>
+    <p class="hint" id="hint">Tik op de smoothie om munten te verdienen.</p>
+  </section>
+  <nav class="tabs" role="tablist" aria-label="Menu">
+    <button class="tab" role="tab" id="tabTeam" aria-selected="true" data-tab="team">Team</button>
+    <button class="tab" role="tab" id="tabUpg" aria-selected="false" data-tab="upg">Verbeter<span class="dot" id="upgDot" hidden>0</span></button>
+    <button class="tab" role="tab" id="tabSeason" aria-selected="false" data-tab="season">Seizoen</button>
+  </nav>
+  <div class="panel" id="pTeam" role="tabpanel" aria-labelledby="tabTeam">
+    <div class="seg" id="seg" role="group" aria-label="Aantal kopen">
+      <button data-m="1" aria-pressed="true">×1</button><button data-m="10" aria-pressed="false">×10</button><button data-m="100" aria-pressed="false">×100</button><button data-m="max" aria-pressed="false">Max</button>
+    </div>
+    <div id="workers" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+  <div class="panel" id="pUpg" role="tabpanel" aria-labelledby="tabUpg" hidden></div>
+  <div class="panel" id="pSeason" role="tabpanel" aria-labelledby="tabSeason" hidden>
+    <div class="card">
+      <h3>Nieuw seizoen</h3>
+      <p>Start de bar opnieuw en neem je fans mee. Elke fan geeft 10% extra op alles, voor altijd. Je krijgt fans voor al het geld dat je ooit hebt verdiend.</p>
+      <dl class="facts">
+        <dt>Fans nu</dt><dd id="sFans">0</dd>
+        <dt>Bonus van fans</dt><dd id="sBonus">+0%</dd>
+        <dt>Erbij bij nieuw seizoen</dt><dd id="sGain">0</dd>
+        <dt>Volgende fan vanaf</dt><dd id="sNext">0</dd>
+      </dl>
+      <button class="btn" id="prestige">Start nieuw seizoen</button>
+    </div>
+    <div class="card">
+      <h3>Statistieken</h3>
+      <dl class="facts">
+        <dt>Ooit verdiend</dt><dd id="tTotal">0</dd>
+        <dt>Dit seizoen</dt><dd id="tRun">0</dd>
+        <dt>Keer getikt</dt><dd id="tTaps">0</dd>
+        <dt>Ruzies bemiddeld</dt><dd id="tEv">0</dd>
+        <dt>Speeltijd</dt><dd id="tPlay">0 min</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h3>Instellingen</h3>
+      <button class="btn alt" id="sound">Geluid: aan</button>
+      <button class="btn alt" id="wipe">Alles wissen</button>
+    </div>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  var $ = function(s, r){ return (r || document).querySelector(s); };
+  var pick = function(a){ return a[Math.floor(Math.random() * a.length)]; };
+  var ri = function(a, b){ return a + Math.floor(Math.random() * (b - a + 1)); };
+
+  /* ---------- fruit art ---------- */
+  function face(y, mood){
+    var ink = '#1b1b2f';
+    var eyes = '<circle cx="38" cy="' + y + '" r="7.5" fill="#fff"/><circle cx="62" cy="' + y + '" r="7.5" fill="#fff"/>' +
+      '<circle cx="39.5" cy="' + (y + 1) + '" r="3.8" fill="' + ink + '"/><circle cx="63.5" cy="' + (y + 1) + '" r="3.8" fill="' + ink + '"/>';
+    var cheeks = '<ellipse cx="27" cy="' + (y + 11) + '" rx="5.5" ry="3.4" fill="#ff7a8a" opacity=".45"/><ellipse cx="73" cy="' + (y + 11) + '" rx="5.5" ry="3.4" fill="#ff7a8a" opacity=".45"/>';
+    var mouth = '<path d="M40 ' + (y + 13) + ' Q50 ' + (y + 25) + ' 60 ' + (y + 13) + '" fill="none" stroke="' + ink + '" stroke-width="3.5" stroke-linecap="round"/>';
+    return eyes + cheeks + mouth;
+  }
+  function art(type){
+    var b = '';
+    if (type === 'apple') {
+      b = '<path d="M50 26 C70 12 94 30 89 58 C85 82 66 94 50 89 C34 94 15 82 11 58 C6 30 30 12 50 26Z" fill="#E8433F"/>' +
+          '<ellipse cx="26" cy="40" rx="5" ry="9" fill="#fff" opacity=".28" transform="rotate(20 26 40)"/>' +
+          '<path d="M50 26 Q50 14 56 7" stroke="#6b4a2a" stroke-width="4" fill="none" stroke-linecap="round"/>' +
+          '<path d="M56 14 Q70 3 82 14 Q68 24 56 14Z" fill="#2FA85A"/>' + face(52);
+    } else if (type === 'banana') {
+      b = '<g transform="rotate(16 50 50)"><rect x="29" y="8" width="42" height="86" rx="21" fill="#FFD23F" stroke="#E0A800" stroke-width="3"/>' +
+          '<rect x="42" y="2" width="16" height="12" rx="4" fill="#7a5a2b"/>' +
+          '<ellipse cx="37" cy="30" rx="3.5" ry="9" fill="#fff" opacity=".35"/>' + face(44) + '</g>';
+    } else if (type === 'strawberry') {
+      b = '<path d="M50 94 C20 76 8 50 15 36 C23 22 40 27 50 33 C60 27 77 22 85 36 C92 50 80 76 50 94Z" fill="#E8335A"/>' +
+          '<g fill="#FFE27A"><ellipse cx="24" cy="56" rx="2" ry="3"/><ellipse cx="76" cy="56" rx="2" ry="3"/><ellipse cx="32" cy="74" rx="2" ry="3"/><ellipse cx="68" cy="74" rx="2" ry="3"/><ellipse cx="50" cy="86" rx="2" ry="3"/></g>' +
+          '<path d="M50 34 L36 21 L45 25 L40 10 L50 21 L60 10 L55 25 L64 21Z" fill="#2FA85A"/>' + face(52);
+    } else if (type === 'pineapple') {
+      b = '<path d="M50 34 L32 8 L45 22 L50 2 L55 22 L68 8Z" fill="#2FA85A"/><path d="M50 34 L24 18 L42 32Z" fill="#37BD68"/><path d="M50 34 L76 18 L58 32Z" fill="#37BD68"/>' +
+          '<ellipse cx="50" cy="64" rx="31" ry="33" fill="#F5A623"/>' +
+          '<g fill="#C77B0A" opacity=".55"><circle cx="30" cy="44" r="2.2"/><circle cx="70" cy="44" r="2.2"/><circle cx="24" cy="62" r="2.2"/><circle cx="76" cy="62" r="2.2"/><circle cx="30" cy="80" r="2.2"/><circle cx="70" cy="80" r="2.2"/><circle cx="50" cy="92" r="2.2"/></g>' + face(58);
+    } else if (type === 'orange') {
+      b = '<circle cx="50" cy="55" r="38" fill="#FF9A2E"/><ellipse cx="30" cy="38" rx="5" ry="9" fill="#fff" opacity=".3" transform="rotate(30 30 38)"/>' +
+          '<path d="M50 17 Q52 8 58 5" stroke="#6b4a2a" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M54 14 Q68 4 78 14 Q66 22 54 14Z" fill="#2FA85A"/>' + face(52);
+    } else {
+      b = '<circle cx="50" cy="56" r="35" fill="#7B4FD6"/><ellipse cx="32" cy="40" rx="5" ry="8" fill="#fff" opacity=".28" transform="rotate(25 32 40)"/>' +
+          '<path d="M50 21 Q50 12 56 6" stroke="#6b4a2a" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M56 12 Q70 3 80 13 Q68 22 56 12Z" fill="#2FA85A"/>' + face(54);
+    }
+    return '<svg viewBox="0 0 100 100" aria-hidden="true">' + b + '</svg>';
+  }
+
+  /* ---------- game data ---------- */
+  var R = 1.15;                       /* price growth per purchase */
+  var MS = [10, 25, 50, 100, 200, 400]; /* owned-count milestones, each doubles that worker */
+  var W = [
+    { id: 'apple',      who: 'Appie', role: 'Appelplukker',   cost: 15,      cps: 0.2,  line: 'Plukt appels en klaagt er niet over. Meestal.' },
+    { id: 'banana',     who: 'Bas',   role: 'Banaan-barista', cost: 120,     cps: 1.5,  line: 'Maakt koffie-smoothies met zijn zonnebril op.' },
+    { id: 'strawberry', who: 'Roos',  role: 'Roddelreporter', cost: 1100,    cps: 9,    line: 'Weet alles van iedereen en vertelt het door.' },
+    { id: 'pineapple',  who: 'Ana',   role: 'Influencer',     cost: 12000,   cps: 55,   line: 'Haar filmpjes zijn viraal. De bar is beroemd.' },
+    { id: 'orange',     who: 'Sien',  role: 'Sappenperser',   cost: 130000,  cps: 320,  line: 'Perst alles uit, ook de bedrijfsleider.' },
+    { id: 'grape',      who: 'Dru',   role: 'Druivenboer',    cost: 1400000, cps: 1800, line: 'Levert hele trossen per vrachtwagen.' }
+  ];
+  var CAST = ['apple', 'banana', 'strawberry', 'pineapple'];
+  var T = [ /* each one doubles what a tap earns, plus 2% of production per tap */
+    { id: 't1', name: 'Sterkere pers',  cost: 150,       desc: 'Tikken levert twee keer zoveel op.', tag: '×2' },
+    { id: 't2', name: 'Turbo-pers',     cost: 2000,      desc: 'Nog eens twee keer zoveel per tik.', tag: '×2' },
+    { id: 't3', name: 'Gouden pers',    cost: 60000,     desc: 'Twee keer zoveel per tik.', tag: '×2' },
+    { id: 't4', name: 'Diamanten pers', cost: 3000000,   desc: 'Twee keer zoveel per tik.', tag: '×2' },
+    { id: 't5', name: 'Cosmische pers', cost: 500000000, desc: 'Twee keer zoveel per tik.', tag: '×2' }
+  ];
+  var G = [ /* multiply everyone */
+    { id: 'g1', name: 'Stoere rietjes',    cost: 1000,        mult: 1.5, desc: 'Het hele team werkt 1,5 keer zo hard.', tag: '×1,5' },
+    { id: 'g2', name: 'Neon-menukaart',    cost: 50000,       mult: 2,   desc: 'Meer klanten. Het hele team ×2.', tag: '×2' },
+    { id: 'g3', name: 'Smoothie-app',      cost: 2500000,     mult: 2,   desc: 'Bestellen op de telefoon. Alles ×2.', tag: '×2' },
+    { id: 'g4', name: 'Tweede filiaal',    cost: 150000000,   mult: 3,   desc: 'Een bar in de stad ernaast. Alles ×3.', tag: '×3' },
+    { id: 'g5', name: 'Wereldtournee',     cost: 10000000000, mult: 5,   desc: 'Smoothies op elk continent. Alles ×5.', tag: '×5' }
+  ];
+  var EV = ['Bas en Appie hebben ruzie!', 'Roos heeft een geheim ontdekt!', 'Ana gaat live!', 'Sien en Dru: wie is de lekkerste?', 'Er is een smoothie verdwenen!'];
+  var NEWS = [
+    { t: 'Appie zoekt zijn smoothie nog steeds.' },
+    { t: 'Bas ontkent alles.' },
+    { t: 'Breaking: iemand heeft het laatste rietje opgebruikt.' },
+    { r: 'strawberry', t: 'Roos: "Ik zeg niks, maar ik heb alles gezien."' },
+    { r: 'banana', t: 'Bas draagt zijn zonnebril nu ook binnen.' },
+    { r: 'pineapple', t: 'Ana heeft 3 nieuwe fans. En 2 nieuwe vijanden.' },
+    { r: 'apple', t: 'Appie plukt een appel en vindt een briefje: "Ik weet wat je deed."' },
+    { r: 'orange', t: 'Sien perst zo hard dat de blender trilt.' },
+    { r: 'grape', t: 'Dru heeft per ongeluk 4000 druiven besteld.' },
+    { t: 'Het weer: wolkjes met een kans op ruzie.' },
+    { t: 'De bar is vol. Iedereen wil weten wie de dief is.' }
+  ];
+
+  /* ---------- state ---------- */
+  var KEY = 'smoothiebar.v1';
+  function fresh(){ return { coins: 0, run: 0, total: 0, owned: {}, seen: {}, upg: {}, fans: 0, taps: 0, play: 0, events: 0, boostEnd: 0, muted: false, last: Date.now() }; }
+  function load(){
+    try {
+      var j = localStorage.getItem(KEY);
+      if (j) { var o = JSON.parse(j), f = fresh(); for (var k in o) f[k] = o[k]; ['coins','run','total'].forEach(function(n){ if (!isFinite(f[n])) f[n] = 0; }); return f; }
+    } catch (e) {}
+    return fresh();
+  }
+  var S = load();
+  function save(){ S.last = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+  /* ---------- numbers ---------- */
+  var SUF = ['', 'K', 'mln', 'mld', 'bln', 'bld', 'trl'];
+  function fmt(n){
+    if (!isFinite(n)) return '∞';
+    if (n < 1000) {
+      if (n < 10) return (Math.floor(n * 10) / 10).toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+      return Math.floor(n).toLocaleString('nl-NL');
+    }
+    var e = Math.floor(Math.log10(n) / 3);
+    if (e >= SUF.length) return n.toExponential(2).replace('.', ',').replace('e+', ' e');
+    var v = n / Math.pow(1000, e), d = v < 10 ? 2 : v < 100 ? 1 : 0;
+    return (Math.floor(v * Math.pow(10, d)) / Math.pow(10, d)).toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: d }) + ' ' + SUF[e];
+  }
+  function fmtTime(s){ var m = Math.floor(s / 60); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' u ' + (m % 60) + ' min'; }
+
+  /* ---------- sound ---------- */
+  var ac = null;
+  function tone(f, d, type, vol, delay){
+    if (S.muted) return;
+    try {
+      if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+      var t0 = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
+      o.type = type || 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(vol || 0.06, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+      o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + d + 0.02);
+    } catch (e) {}
+  }
+  var sfx = {
+    tap: function(){ tone(520 + Math.random() * 120, .07, 'triangle', .05); },
+    buy: function(){ tone(440, .1, 'triangle', .08); tone(660, .14, 'triangle', .08, .08); },
+    event: function(){ tone(784, .12, 'triangle', .07); tone(1047, .2, 'triangle', .07, .1); },
+    big: function(){ [523, 659, 784, 1047].forEach(function(f, i){ tone(f, .22, 'triangle', .08, i * .12); }); }
+  };
+
+  /* ---------- game maths ---------- */
+  function owned(w){ return S.owned[w.id] || 0; }
+  function msMult(n){ var m = 1; MS.forEach(function(t){ if (n >= t) m *= 2; }); return m; }
+  function gMult(){ var m = 1; G.forEach(function(g){ if (S.upg[g.id]) m *= g.mult; }); return m; }
+  function tapK(){ var k = 0; T.forEach(function(t){ if (S.upg[t.id]) k++; }); return k; }
+  function fanMult(){ return 1 + 0.1 * S.fans; }
+  function boostM(){ return Date.now() < S.boostEnd ? 7 : 1; }
+  function wCps(w){ var n = owned(w); return w.cps * n * msMult(n) * gMult() * fanMult(); }
+  function cpsBase(){ var s = 0; W.forEach(function(w){ s += wCps(w); }); return s; }
+  function cps(){ return cpsBase() * boostM(); }
+  function tapVal(){ var k = tapK(); return (Math.pow(2, k) + cpsBase() * 0.02 * k) * fanMult() * boostM(); }
+  function costFor(w, n){ return w.cost * Math.pow(R, owned(w)) * (Math.pow(R, n) - 1) / (R - 1); }
+  function maxN(w, coins){
+    var base = w.cost * Math.pow(R, owned(w));
+    var n = Math.floor(Math.log(coins * (R - 1) / base + 1) / Math.log(R));
+    while (n > 0 && costFor(w, n) > coins) n--;
+    return Math.max(0, n);
+  }
+  var mode = '1';
+  function qty(w){ return mode === 'max' ? Math.max(1, maxN(w, S.coins)) : parseInt(mode, 10); }
+  function nextMs(n){ for (var i = 0; i < MS.length; i++) if (MS[i] > n) return MS[i]; return null; }
+  function fansPotential(){ return Math.floor(Math.sqrt(S.total / 500000)); }
+  function fansGain(){ return Math.max(0, fansPotential() - S.fans); }
+  function earn(x){ S.coins += x; S.run += x; S.total += x; }
+
+  /* ---------- toast ---------- */
+  var toastT = null;
+  function toast(msg, ms){
+    var t = $('#toast'); t.textContent = msg; t.classList.add('on');
+    clearTimeout(toastT); toastT = setTimeout(function(){ t.classList.remove('on'); }, ms || 3200);
+  }
+
+  /* ---------- build: team rows ---------- */
+  var rows = {};
+  var wBox = $('#workers');
+  W.forEach(function(w){
+    var el = document.createElement('div');
+    el.className = 'row';
+    el.innerHTML = '<div class="av">' + art(w.id) + '<b>0</b></div><div class="inf"><h3></h3><p class="ln"></p><p class="pr"></p></div>' +
+      '<button class="buy"><span class="bl">Koop</span><span class="bc">0</span></button>';
+    wBox.appendChild(el);
+    rows[w.id] = { el: el, av: $('.av', el), cnt: $('.av b', el), h: $('h3', el), ln: $('.ln', el), pr: $('.pr', el), btn: $('.buy', el), bl: $('.bl', el), bc: $('.bc', el) };
+    rows[w.id].btn.onclick = function(){ buy(w); };
+  });
+
+  function buy(w){
+    var q = qty(w), c = Math.ceil(costFor(w, q));
+    if (S.coins < c) return;
+    var before = owned(w), msBefore = msMult(before);
+    S.coins -= c; S.owned[w.id] = before + q;
+    sfx.buy();
+    if (msMult(owned(w)) > msBefore) { toast(w.who + ' en collega\'s: dubbele snelheid!'); sfx.big(); }
+    drawTeam(); refresh(); save();
+  }
+
+  /* ---------- build: stage team ---------- */
+  function drawTeam(){
+    var h = '', i = 0;
+    W.forEach(function(w){
+      var n = owned(w);
+      if (n > 0) { h += '<div class="av" style="--d:' + (i * 0.35) + 's">' + art(w.id) + '<b>' + n + '</b></div>'; i++; }
+    });
+    $('#team').innerHTML = h;
+    $('#hint').hidden = i > 0 && S.total > 60;
+  }
+
+  /* ---------- build: upgrades ---------- */
+  var upgBox = $('#pUpg');
+  function upgList(){
+    var all = [];
+    T.forEach(function(t){ if (!S.upg[t.id]) all.push({ u: t, kind: 'tap' }); });
+    G.forEach(function(g){ if (!S.upg[g.id]) all.push({ u: g, kind: 'g' }); });
+    all.sort(function(a, b){ return a.u.cost - b.u.cost; });
+    return all;
+  }
+  function drawUpg(){
+    var list = upgList(), shown = list.slice(0, 5), h = '';
+    shown.forEach(function(x){
+      h += '<div class="row"><div class="mul ' + (x.kind === 'tap' ? 'tap' : '') + '">' + x.u.tag + '</div><div class="inf"><h3>' + x.u.name + '</h3><p>' + x.u.desc + '</p>' +
+        '<p class="pr">' + (x.kind === 'tap' ? 'Voor het tikken' : 'Voor het hele team') + '</p></div>' +
+        '<button class="buy" data-id="' + x.u.id + '" data-cost="' + x.u.cost + '"><span class="bl">Koop</span><span class="bc">' + fmt(x.u.cost) + '</span></button></div>';
+    });
+    if (!shown.length) h = '<p class="note">Alle verbeteringen zijn gekocht. Start een nieuw seizoen voor extra bonussen.</p>';
+    else if (list.length > shown.length) h += '<p class="note">Nog ' + (list.length - shown.length) + ' verbeteringen komen eraan.</p>';
+    upgBox.innerHTML = h;
+    upgBox.querySelectorAll('.buy').forEach(function(b){
+      b.onclick = function(){
+        var cost = parseFloat(b.dataset.cost);
+        if (S.coins < cost) return;
+        S.coins -= cost; S.upg[b.dataset.id] = 1; sfx.buy(); toast('Verbetering gekocht!');
+        drawUpg(); refresh(); save();
+      };
+    });
+  }
+
+  /* ---------- refresh (runs every 250 ms) ---------- */
+  function refresh(){
+    $('#coins').textContent = fmt(S.coins);
+    $('#rate').textContent = fmt(cps());
+    var bp = $('#boostPill'), left = Math.ceil((S.boostEnd - Date.now()) / 1000);
+    bp.hidden = left <= 0; if (left > 0) bp.textContent = 'Drama-boost ×7 · ' + left + ' s';
+    var fp = $('#fansPill'); fp.hidden = S.fans < 1; if (S.fans > 0) fp.textContent = fmt(S.fans) + ' fans · +' + (S.fans * 10) + '%';
+
+    W.forEach(function(w){
+      var r = rows[w.id], n = owned(w);
+      if (!S.seen[w.id] && (n > 0 || S.coins >= w.cost * 0.5)) S.seen[w.id] = 1;
+      var locked = !S.seen[w.id];
+      r.av.classList.toggle('locked', locked);
+      r.cnt.textContent = n;
+      r.h.textContent = locked ? '???' : w.who + ' · ' + w.role;
+      r.ln.textContent = locked ? 'Verdien meer munten om deze medewerker te ontmoeten.' : w.line;
+      if (locked) r.pr.textContent = '';
+      else if (n > 0) { var nx = nextMs(n); r.pr.textContent = 'Samen ' + fmt(wCps(w)) + ' per sec. ' + (nx ? 'Dubbel bij ' + nx + '.' : 'Alle bonussen gehaald.'); }
+      else r.pr.textContent = 'Levert ' + fmt(w.cps * gMult() * fanMult()) + ' per sec.';
+      var q = qty(w), c = Math.ceil(costFor(w, q));
+      r.bl.textContent = 'Koop ×' + q;
+      r.bc.textContent = fmt(c);
+      r.btn.disabled = locked || S.coins < c;
+    });
+
+    var aff = 0;
+    upgBox.querySelectorAll('.buy').forEach(function(b){ var ok = S.coins >= parseFloat(b.dataset.cost); b.disabled = !ok; if (ok) aff++; });
+    var dot = $('#upgDot'); dot.hidden = aff < 1; dot.textContent = aff;
+
+    if (!$('#pSeason').hidden) drawSeason();
+  }
+
+  function drawSeason(){
+    var gain = fansGain();
+    $('#sFans').textContent = fmt(S.fans);
+    $('#sBonus').textContent = '+' + (S.fans * 10) + '%';
+    $('#sGain').textContent = '+' + fmt(gain);
+    $('#sNext').textContent = fmt(500000 * Math.pow(Math.max(S.fans, fansPotential()) + 1, 2)) + ' totaal';
+    var pb = $('#prestige');
+    if (!armed) { pb.textContent = gain > 0 ? 'Start nieuw seizoen (+' + fmt(gain) + ' fans)' : 'Nog geen nieuwe fans te halen'; }
+    pb.disabled = gain < 1;
+    $('#tTotal').textContent = fmt(S.total);
+    $('#tRun').textContent = fmt(S.run);
+    $('#tTaps').textContent = fmt(S.taps);
+    $('#tEv').textContent = fmt(S.events);
+    $('#tPlay').textContent = fmtTime(S.play);
+    $('#sound').textContent = 'Geluid: ' + (S.muted ? 'uit' : 'aan');
+  }
+
+  /* ---------- tapping ---------- */
+  var cup = $('#cup'), stage = $('#stage');
+  function tap(x, y){
+    var v = tapVal();
+    earn(v); S.taps++;
+    sfx.tap();
+    cup.firstElementChild.animate([{ transform: 'scale(1)' }, { transform: 'scale(.92,1.06)' }, { transform: 'scale(1)' }], { duration: 150 });
+    var f = document.createElement('span'); f.className = 'fl'; f.textContent = '+' + fmt(v);
+    f.style.left = x + 'px'; f.style.top = y + 'px';
+    stage.appendChild(f);
+    var a = f.animate([{ transform: 'translate(-50%,0)', opacity: 1 }, { transform: 'translate(-50%,-70px)', opacity: 0 }], { duration: 750, easing: 'ease-out' });
+    a.onfinish = function(){ f.remove(); };
+    refresh();
+  }
+  cup.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    var r = stage.getBoundingClientRect();
+    tap(e.clientX - r.left, e.clientY - r.top - 20);
+  });
+  cup.addEventListener('click', function(e){
+    if (e.detail === 0) { var r = cup.getBoundingClientRect(), s = stage.getBoundingClientRect(); tap(r.left - s.left + r.width / 2, r.top - s.top + r.height / 3); }
+  });
+
+  /* ---------- drama events ---------- */
+  var evEl = null, nextEv = Date.now() + 30000;
+  function spawnEvent(){
+    var el = document.createElement('button');
+    el.className = 'drama';
+    el.innerHTML = '<span class="dart">' + art(pick(CAST)) + '</span><span>' + pick(EV) + ' Tik!</span>';
+    el.style.left = ri(4, 22) + '%'; el.style.top = ri(6, 30) + '%';
+    stage.appendChild(el); evEl = el; sfx.event();
+    var gone = setTimeout(function(){ remove(); }, 13000);
+    function remove(){ clearTimeout(gone); if (el.parentNode) el.remove(); evEl = null; nextEv = Date.now() + ri(60, 110) * 1000; }
+    el.onclick = function(){
+      remove(); S.events++;
+      if (Math.random() < 0.5) {
+        var gain = Math.max(cpsBase() * 100 + tapVal() * 10, 25);
+        earn(gain); toast('Bemiddeld! Je krijgt ' + fmt(gain) + ' munten.');
+      } else {
+        S.boostEnd = Date.now() + 25000; toast('Drama-boost! Alles gaat 25 seconden 7 keer zo snel.');
+      }
+      sfx.big(); refresh(); save();
+    };
+  }
+
+  /* ---------- ticker ---------- */
+  var tick = $('#ticker');
+  function news(){
+    var pool = NEWS.filter(function(n){ return !n.r || S.owned[n.r] > 0; });
+    tick.style.opacity = 0;
+    setTimeout(function(){ tick.textContent = pick(pool).t; tick.style.opacity = 1; }, 400);
+  }
+
+  /* ---------- tabs ---------- */
+  var panels = { team: $('#pTeam'), upg: $('#pUpg'), season: $('#pSeason') };
+  document.querySelectorAll('.tab').forEach(function(b){
+    b.onclick = function(){
+      document.querySelectorAll('.tab').forEach(function(x){ x.setAttribute('aria-selected', x === b ? 'true' : 'false'); });
+      for (var k in panels) panels[k].hidden = k !== b.dataset.tab;
+      refresh();
+    };
+  });
+  document.querySelectorAll('#seg button').forEach(function(b){
+    b.onclick = function(){
+      mode = b.dataset.m;
+      document.querySelectorAll('#seg button').forEach(function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      refresh();
+    };
+  });
+
+  /* ---------- season, sound, wipe ---------- */
+  var armed = false, armT = null;
+  $('#prestige').onclick = function(){
+    var pb = $('#prestige');
+    if (!armed) { armed = true; pb.textContent = 'Zeker weten? Tik nog een keer. Je team en munten gaan weg.'; armT = setTimeout(function(){ armed = false; drawSeason(); }, 6000); return; }
+    clearTimeout(armT); armed = false;
+    var g = fansGain(); if (g < 1) return;
+    S.fans += g; S.coins = 0; S.run = 0; S.owned = {}; S.seen = {}; S.upg = {}; S.boostEnd = 0;
+    sfx.big(); toast('Nieuw seizoen! Je hebt nu ' + fmt(S.fans) + ' fans.');
+    drawTeam(); drawUpg(); refresh(); save();
+  };
+  $('#sound').onclick = function(){ S.muted = !S.muted; drawSeason(); save(); };
+  var wipeArmed = false, wipeT = null;
+  $('#wipe').onclick = function(){
+    var b = $('#wipe');
+    if (!wipeArmed) { wipeArmed = true; b.textContent = 'Zeker weten? Tik nog een keer om alles te wissen.'; wipeT = setTimeout(function(){ wipeArmed = false; b.textContent = 'Alles wissen'; }, 6000); return; }
+    clearTimeout(wipeT); wipeArmed = false; b.textContent = 'Alles wissen';
+    var m = S.muted; S = fresh(); S.muted = m;
+    drawTeam(); drawUpg(); refresh(); save(); toast('Alles is gewist. Begin maar opnieuw!');
+  };
+
+  /* ---------- main loop ---------- */
+  var lastT = Date.now();
+  function loop(){
+    var now = Date.now(), dt = Math.min(Math.max((now - lastT) / 1000, 0), 3600); lastT = now;
+    var g = cps() * dt; earn(g); S.play += dt;
+    if (!evEl && now >= nextEv) spawnEvent();
+    refresh();
+  }
+  setInterval(loop, 250);
+  setInterval(save, 5000);
+  setInterval(news, 8000);
+  document.addEventListener('visibilitychange', function(){ if (document.hidden) save(); });
+  window.addEventListener('pagehide', save);
+
+  /* ---------- start: offline earnings ---------- */
+  (function(){
+    var away = (Date.now() - S.last) / 1000, c = cpsBase();
+    if (away > 60 && c > 0) {
+      var gain = c * Math.min(away, 8 * 3600) * 0.5;
+      earn(gain);
+      setTimeout(function(){ toast('Welkom terug! Terwijl je weg was verdiende het team ' + fmt(gain) + ' munten.', 6000); }, 600);
+    }
+  })();
+  drawTeam(); drawUpg(); refresh(); news();
+})();
+</script>
+
+</body></html>
